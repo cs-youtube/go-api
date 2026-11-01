@@ -17,9 +17,9 @@ func request(method, url, body string) *httptest.ResponseRecorder {
 }
 
 func TestListItemsHonoursLimit(t *testing.T) {
-	var items []Item
+	var list []Item
 	rec := request("GET", "/items?limit=3", "")
-	if err := json.Unmarshal(rec.Body.Bytes(), &items); err != nil || len(items) != 3 {
+	if err := json.Unmarshal(rec.Body.Bytes(), &list); err != nil || len(list) != 3 {
 		t.Fatalf("got %s (%v)", rec.Body, err)
 	}
 }
@@ -32,6 +32,9 @@ func TestGetItem(t *testing.T) {
 	}
 	if rec := request("GET", "/items/x", ""); rec.Code != http.StatusBadRequest {
 		t.Fatalf("bad id: got %d", rec.Code)
+	}
+	if rec := request("GET", "/items/1000", ""); rec.Code != http.StatusNotFound {
+		t.Fatalf("unknown id: got %d", rec.Code)
 	}
 }
 

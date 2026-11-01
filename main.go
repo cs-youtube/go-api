@@ -3,7 +3,6 @@
 package main
 
 import (
-	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -24,14 +23,22 @@ type Item struct {
 	Tags   []string `json:"tags"`
 }
 
-func newItem(id uint64) Item {
-	return Item{
-		ID:     id,
-		Name:   "item-" + strconv.FormatUint(id, 10),
-		Price:  float64(id) * 1.5,
-		Active: id%2 == 0,
-		Tags:   []string{"alpha", "beta", "gamma"},
+// items is the model: created once at start and only read after that.
+var items = newItems(1000)
+
+func newItems(count int) []Item {
+	list := make([]Item, count)
+	for i := range list {
+		id := uint64(i)
+		list[i] = Item{
+			ID:     id,
+			Name:   "item-" + strconv.FormatUint(id, 10),
+			Price:  float64(id) * 1.5,
+			Active: id%2 == 0,
+			Tags:   []string{"alpha", "beta", "gamma"},
+		}
 	}
+	return list
 }
 
 func intParam(r *http.Request, name string, fallback, max int) int {
@@ -50,11 +57,7 @@ func writeJSON(w http.ResponseWriter, code int, value any) {
 }
 
 func listItems(w http.ResponseWriter, r *http.Request) {
-	items := make([]Item, intParam(r, "limit", 50, 1000))
-	for i := range items {
-		items[i] = newItem(uint64(i))
-	}
-	writeJSON(w, http.StatusOK, items)
+	writeJSON(w, http.StatusOK, items[:intParam(r, "limit", 50, len(items))])
 }
 
 func getItem(w http.ResponseWriter, r *http.Request) {
@@ -63,7 +66,11 @@ func getItem(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "bad id", http.StatusBadRequest)
 		return
 	}
-	writeJSON(w, http.StatusOK, newItem(id))
+	if id >= uint64(len(items)) {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	writeJSON(w, http.StatusOK, items[id])
 }
 
 func createItem(w http.ResponseWriter, r *http.Request) {
@@ -73,15 +80,6 @@ func createItem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusCreated, item)
-}
-
-// work burns CPU for a fixed amount of work: n rounds of SHA-256.
-func work(w http.ResponseWriter, r *http.Request) {
-	sum := sha256.Sum256(nil)
-	for i := intParam(r, "n", 10000, 10000000); i > 0; i-- {
-		sum = sha256.Sum256(sum[:])
-	}
-	fmt.Fprintf(w, "%x\n", sum[:4])
 }
 
 // statusWriter remembers the status code for the metrics.
@@ -121,7 +119,6 @@ func newHandler(registry *prometheus.Registry) http.Handler {
 	handle("GET", "/items", listItems)
 	handle("POST", "/items", createItem)
 	handle("GET", "/items/{id}", getItem)
-	handle("GET", "/work", work)
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) { fmt.Fprintln(w, "ok") })
 	mux.Handle("GET /metrics", promhttp.HandlerFor(registry, promhttp.HandlerOpts{}))
 	return mux
