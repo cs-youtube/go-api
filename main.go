@@ -97,7 +97,7 @@ func newHandler(registry *prometheus.Registry) http.Handler {
 	requests := prometheus.NewHistogramVec(prometheus.HistogramOpts{
 		Name:    "http_request_duration_seconds",
 		Help:    "Time from receiving a request to finishing its response.",
-		Buckets: []float64{.0005, .001, .002, .005, .01, .02, .05, .1, .2, .5, 1, 2, 5, 10},
+		Buckets: []float64{.000025, .00005, .0001, .00025, .0005, .001, .002, .005, .01, .02, .05, .1, .2, .5, 1, 2, 5, 10},
 	}, []string{"method", "route", "code"})
 	inFlight := prometheus.NewGauge(prometheus.GaugeOpts{
 		Name: "http_requests_in_flight",
